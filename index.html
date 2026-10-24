@@ -1,0 +1,1256 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>MD Desk</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --bg: #f5f7fa;
+      --panel: #ffffff;
+      --panel-2: #f8fafc;
+      --line: #dfe4ea;
+      --line-strong: #cbd2da;
+      --text: #20262e;
+      --muted: #68717d;
+      --accent: #1769e0;
+      --accent-soft: #eaf2ff;
+      --topbar: #163f32;
+      --topbar-text: #f5fbf8;
+      --shadow: 0 12px 35px rgba(24, 34, 48, .12);
+      --sidebar-width: 286px;
+      --editor-font-size: 15px;
+      --content-width: 900px;
+    }
+
+    [data-theme="dark"] {
+      color-scheme: dark;
+      --bg: #11151a;
+      --panel: #181d24;
+      --panel-2: #20262e;
+      --line: #313a45;
+      --line-strong: #46515e;
+      --text: #e8edf2;
+      --muted: #9ba6b2;
+      --accent: #70a7ff;
+      --accent-soft: #203653;
+      --topbar: #102c25;
+      --topbar-text: #f2faf6;
+      --shadow: 0 12px 35px rgba(0, 0, 0, .35);
+    }
+
+    * { box-sizing: border-box; }
+    html, body { width: 100%; height: 100%; margin: 0; overflow: hidden; }
+    html, body, .preview-pane, #preview, .editor-pane, #editor, #outline {
+      overflow-anchor: none;
+    }
+    body {
+      position: fixed; inset: 0;
+      background: var(--bg);
+      color: var(--text);
+      font-family: Pretendard, "Noto Sans KR", "Malgun Gothic", system-ui, sans-serif;
+    }
+    button, input, textarea { font: inherit; }
+    button { color: inherit; }
+
+    .app { display: grid; grid-template-rows: 38px 50px minmax(0, 1fr) 27px; width: 100%; height: 100dvh; overflow: hidden; }
+    .titlebar {
+      display: flex; align-items: center; gap: 10px; padding: 0 14px;
+      background: var(--topbar); color: var(--topbar-text); font-size: 13px;
+    }
+    .logo {
+      display: grid; place-items: center; width: 22px; height: 22px;
+      border: 1px solid rgba(255,255,255,.6); border-radius: 5px; font-weight: 800;
+    }
+    #documentTitle { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    #dirtyMark { color: #ffcd70; }
+
+    .toolbar {
+      display: flex; align-items: center; gap: 6px; padding: 6px 10px;
+      position: relative; background: var(--panel); border-bottom: 1px solid var(--line); z-index: 25;
+    }
+    .tool, .menu-button, .mode-button {
+      border: 0; background: transparent; border-radius: 6px; cursor: pointer;
+    }
+    .tool { width: 36px; height: 36px; font-size: 18px; }
+    .tool:hover, .menu-button:hover { background: var(--panel-2); }
+    .tool:focus-visible, .menu-button:focus-visible, .mode-button:focus-visible,
+    input:focus-visible, textarea:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+    .separator { width: 1px; height: 26px; background: var(--line); margin: 0 3px; }
+
+    .menus { display: flex; gap: 2px; margin-right: 4px; }
+    .menu { position: relative; }
+    .menu-button { padding: 8px 9px; font-size: 13px; }
+    .menu-panel {
+      display: none; position: absolute; top: 38px; left: 0; min-width: 210px;
+      padding: 6px; background: var(--panel); border: 1px solid var(--line);
+      border-radius: 8px; box-shadow: var(--shadow); z-index: 30;
+    }
+    .menu.open .menu-panel { display: block; }
+    .menu-panel button {
+      display: flex; justify-content: space-between; width: 100%; padding: 8px 10px;
+      border: 0; border-radius: 5px; background: transparent; cursor: pointer; text-align: left;
+    }
+    .menu-panel button:hover { background: var(--accent-soft); }
+    .shortcut { margin-left: 20px; color: var(--muted); font-size: 12px; }
+
+    .mode-switch {
+      display: flex; gap: 2px; margin-left: auto; padding: 3px;
+      background: var(--panel-2); border: 1px solid var(--line); border-radius: 9px;
+    }
+    .mode-button { padding: 7px 11px; color: var(--muted); font-size: 13px; white-space: nowrap; }
+    .mode-button.active { color: white; background: var(--accent); box-shadow: 0 1px 3px rgba(0,0,0,.16); }
+    .nav-toggle {
+      display: inline-flex; align-items: center; gap: 6px; height: 36px; padding: 0 11px;
+      border: 1px solid var(--line); border-radius: 8px; color: var(--muted);
+      background: var(--panel-2); cursor: pointer; white-space: nowrap; font-size: 13px;
+    }
+    .nav-toggle.active { color: var(--accent); border-color: var(--accent); background: var(--accent-soft); }
+    .nav-toggle:hover { border-color: var(--accent); }
+
+    .workspace { display: grid; grid-template-columns: var(--sidebar-width) minmax(0, 1fr); min-width: 0; min-height: 0; overflow: hidden; }
+    .sidebar {
+      min-width: 0; background: var(--panel); border-right: 1px solid var(--line);
+      display: flex; flex-direction: column; overflow: hidden;
+    }
+    .side-head { display: flex; flex: 0 0 auto; align-items: center; padding: 12px 12px 8px; }
+    .side-head strong { font-size: 14px; }
+    .side-head button { margin-left: auto; border: 0; background: transparent; cursor: pointer; color: var(--muted); }
+    .search-wrap { flex: 0 0 auto; padding: 0 10px 9px; }
+    #outlineSearch {
+      width: 100%; height: 36px; padding: 0 11px; color: var(--text); background: var(--panel-2);
+      border: 1px solid var(--line); border-radius: 6px;
+    }
+    .outline-label { flex: 0 0 auto; padding: 7px 12px; background: var(--panel-2); border-block: 1px solid var(--line); font-size: 12px; font-weight: 700; }
+    #outline { flex: 1 1 0; min-height: 0; overflow: auto; padding: 6px; }
+    .outline-item {
+      display: block; width: 100%; padding: 7px 8px; overflow: hidden; text-overflow: ellipsis;
+      border: 0; border-radius: 5px; background: transparent; text-align: left; white-space: nowrap; cursor: pointer;
+      color: var(--text); transition: background .12s, color .12s;
+    }
+    .outline-item:hover { background: var(--accent-soft); }
+    .outline-item.active { background: var(--accent-soft); color: var(--accent); font-weight: 700; }
+    .outline-item::before { content: "›"; display: inline-block; margin-right: 7px; color: var(--muted); }
+    .outline-item.active::before { color: var(--accent); font-weight: 700; }
+    .outline-empty { padding: 18px 10px; color: var(--muted); font-size: 13px; text-align: center; }
+    .resize-handle { position: absolute; width: 7px; top: 88px; bottom: 27px; left: calc(var(--sidebar-width) - 4px); cursor: col-resize; z-index: 20; }
+
+    .main { position: relative; min-width: 0; min-height: 0; overflow: hidden; }
+    .drop-zone {
+      display: none; position: absolute; inset: 14px; place-items: center; z-index: 50;
+      border: 3px dashed var(--accent); border-radius: 14px; color: var(--accent);
+      background: color-mix(in srgb, var(--panel) 90%, transparent); font-size: 20px; font-weight: 700;
+    }
+    body.dragging .drop-zone { display: grid; }
+    .pane-grid { display: grid; height: 100%; min-width: 0; }
+    .pane-grid[data-mode="preview"] { grid-template-columns: 0 1fr; }
+    .pane-grid[data-mode="edit"] { grid-template-columns: 1fr 0; }
+    .pane-grid[data-mode="split"] { grid-template-columns: minmax(320px, 1fr) minmax(320px, 1fr); }
+    .editor-pane, .preview-pane { min-width: 0; min-height: 0; overflow: hidden; background: var(--panel); }
+    .editor-pane { border-right: 1px solid var(--line); }
+    .pane-grid[data-mode="preview"] .editor-pane, .pane-grid[data-mode="edit"] .preview-pane { visibility: hidden; }
+    #editor {
+      width: 100%; height: 100%; resize: none; padding: 26px 30px; border: 0; outline: none;
+      color: var(--text); background: var(--panel); font: var(--editor-font-size)/1.72 "Cascadia Code", Consolas, monospace;
+      tab-size: 2;
+    }
+    .preview-pane { overflow: auto; scroll-behavior: smooth; }
+    #preview { width: min(100% - 48px, var(--content-width)); margin: 0 auto; padding: 35px 12px 90px; line-height: 1.75; }
+    #preview[contenteditable="true"] { min-height: 100%; outline: none; caret-color: var(--accent); }
+    #preview[contenteditable="true"]:focus { background: linear-gradient(var(--panel), var(--panel)) padding-box; }
+    #preview[contenteditable="true"]:empty::before { content: "여기에 내용을 입력하세요…"; color: var(--muted); }
+    #preview :is(h1, h2, h3, h4, h5, h6) { scroll-margin-top: 24px; line-height: 1.32; border-radius: 6px; }
+    #preview :is(h1, h2, h3, h4, h5, h6).heading-highlight {
+      animation: headingFlash 1.6s ease-out;
+    }
+    @keyframes headingFlash {
+      0% { background: var(--accent-soft); }
+      70% { background: var(--accent-soft); }
+      100% { background: transparent; }
+    }
+    #preview h1 { margin: .2em 0 1em; padding-bottom: .35em; border-bottom: 1px solid var(--line); font-size: 2em; }
+    #preview h2 { margin-top: 1.7em; padding-bottom: .28em; border-bottom: 1px solid var(--line); font-size: 1.5em; }
+    #preview h3 { margin-top: 1.5em; font-size: 1.24em; }
+    #preview h4, #preview h5, #preview h6 { margin-top: 1.4em; }
+    #preview a { color: var(--accent); }
+    #preview img { max-width: 100%; border-radius: 8px; }
+    #preview blockquote { margin-left: 0; padding: 2px 18px; color: var(--muted); border-left: 4px solid var(--line-strong); }
+    #preview code { padding: .15em .38em; border-radius: 4px; background: var(--panel-2); font-family: "Cascadia Code", Consolas, monospace; font-size: .9em; }
+    #preview pre { overflow: auto; padding: 18px; border: 1px solid var(--line); border-radius: 8px; background: var(--panel-2); line-height: 1.55; }
+    #preview pre code { padding: 0; background: none; }
+    #preview table { width: 100%; border-collapse: collapse; margin: 1em 0; }
+    #preview th, #preview td { padding: 8px 11px; border: 1px solid var(--line); text-align: left; }
+    #preview th { background: var(--panel-2); }
+    #preview hr { border: 0; border-top: 1px solid var(--line); margin: 2em 0; }
+    #preview li { margin: .2em 0; }
+    #preview li.task-item { list-style: none; margin-left: -1.35em; }
+    #preview li.task-item input[type="checkbox"] {
+      width: 15px; height: 15px; margin: 0 .5em 0 0; vertical-align: -2px;
+      accent-color: var(--accent);
+    }
+    .welcome { display: grid; place-items: center; min-height: calc(100vh - 190px); color: var(--muted); text-align: center; }
+    .welcome-icon { font-size: 52px; }
+
+    .statusbar {
+      display: flex; align-items: center; gap: 16px; padding: 0 11px;
+      background: var(--panel-2); border-top: 1px solid var(--line); color: var(--muted); font-size: 11px;
+    }
+    #statusMessage { margin-right: auto; }
+    .sidebar-hidden { --sidebar-width: 0px; }
+    .sidebar-hidden .sidebar { display: none; }
+    .sidebar-hidden .workspace { grid-template-columns: 1fr; }
+    .sidebar-hidden .resize-handle { display: none; }
+
+    .toast {
+      position: fixed; right: 18px; bottom: 42px; z-index: 100; padding: 10px 14px;
+      border-radius: 8px; background: #202830; color: white; box-shadow: var(--shadow);
+      transform: translateY(20px); opacity: 0; transition: .2s; pointer-events: none;
+    }
+    .toast.show { transform: translateY(0); opacity: 1; }
+    .to-top {
+      position: absolute; right: 22px; bottom: 20px; z-index: 18; padding: 9px 13px;
+      border: 1px solid var(--line-strong); border-radius: 999px; color: var(--text);
+      background: var(--panel); box-shadow: var(--shadow); cursor: pointer;
+      opacity: 0; transform: translateY(10px); pointer-events: none; transition: .18s;
+    }
+    .to-top.show { opacity: 1; transform: translateY(0); pointer-events: auto; }
+    .to-top:hover { color: white; border-color: var(--accent); background: var(--accent); }
+
+    @media (max-width: 760px) {
+      :root { --sidebar-width: 220px; }
+      .menus, .tool.secondary { display: none; }
+      .mode-button { padding-inline: 8px; }
+      .mode-button span { display: none; }
+      .pane-grid[data-mode="split"] { grid-template-columns: 1fr; }
+      .pane-grid[data-mode="split"] .preview-pane { display: none; }
+    }
+
+    /* Mermaid 다이어그램 스타일 */
+    .mermaid-block {
+      margin: 1.6em 0;
+      padding: 16px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: var(--panel-2);
+      text-align: center;
+      overflow-x: auto;
+      transition: border-color .2s;
+    }
+    .mermaid-block:hover { border-color: var(--line-strong); }
+    .mermaid-svg-wrapper { display: inline-block; max-width: 100%; }
+    .mermaid-svg-wrapper svg { max-width: 100%; height: auto; display: block; margin: 0 auto; }
+    .mermaid-loading { color: var(--muted); font-size: 13px; padding: 18px; }
+    .mermaid-fallback-box, .mermaid-error-box { text-align: left; }
+    .mermaid-fallback-head, .mermaid-error-head {
+      display: flex; align-items: center; justify-content: space-between;
+      font-size: 13px; font-weight: 600; margin-bottom: 8px;
+    }
+    .mermaid-error-head { color: #e03131; }
+    .mermaid-error-detail { font-size: 12px; color: #e03131; margin-bottom: 8px; }
+    .mermaid-offline-badge {
+      font-size: 11px; padding: 2px 7px; border-radius: 4px;
+      background: var(--line); color: var(--muted); font-weight: normal;
+    }
+    .mermaid-fallback-code {
+      margin: 0; padding: 12px; background: var(--panel);
+      border: 1px solid var(--line); border-radius: 6px;
+      font-family: "Cascadia Code", Consolas, monospace; font-size: 12px;
+      overflow-x: auto; line-height: 1.5;
+    }
+
+    /* 모달 대화상자 스타일 */
+    .modal-backdrop {
+      position: fixed; inset: 0; background: rgba(0, 0, 0, 0.48);
+      backdrop-filter: blur(3px); z-index: 200; display: none; place-items: center; padding: 20px;
+    }
+    .modal-backdrop.show { display: grid; }
+    .modal {
+      width: min(100%, 580px); max-height: 85vh; background: var(--panel);
+      border: 1px solid var(--line-strong); border-radius: 12px; box-shadow: var(--shadow);
+      display: flex; flex-direction: column; overflow: hidden; animation: modalPop .15s ease-out;
+    }
+    @keyframes modalPop {
+      from { opacity: 0; transform: scale(.96); }
+      to { opacity: 1; transform: scale(1); }
+    }
+    .modal-header {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 14px 20px; border-bottom: 1px solid var(--line);
+    }
+    .modal-header h3 { margin: 0; font-size: 16px; font-weight: 700; }
+    .modal-close {
+      border: 0; background: transparent; font-size: 22px; cursor: pointer; color: var(--muted);
+      border-radius: 6px; width: 32px; height: 32px; display: grid; place-items: center; line-height: 1;
+    }
+    .modal-close:hover { background: var(--panel-2); color: var(--text); }
+    .modal-footer {
+      padding: 12px 20px; border-top: 1px solid var(--line); display: flex; justify-content: flex-end; background: var(--panel-2);
+    }
+    .modal-confirm-btn {
+      padding: 7px 20px; border: 0; border-radius: 6px; background: var(--accent); color: white;
+      cursor: pointer; font-weight: 600; font-size: 13px;
+    }
+    .modal-confirm-btn:hover { filter: brightness(1.1); }
+    .modal-body {
+      padding: 20px; overflow-y: auto; font-size: 13.5px; line-height: 1.68;
+    }
+    .modal-body h4 { margin: 16px 0 8px; font-size: 14px; color: var(--accent); }
+    .modal-body h4:first-child { margin-top: 0; }
+    .modal-body table { width: 100%; border-collapse: collapse; margin: 8px 0; font-size: 13px; }
+    .modal-body th, .modal-body td { padding: 7px 11px; border: 1px solid var(--line); text-align: left; }
+    .modal-body th { background: var(--panel-2); }
+    .modal-badge {
+      display: inline-block; padding: 2px 7px; border-radius: 4px; font-size: 11px; font-weight: 700;
+      background: var(--accent-soft); color: var(--accent); margin-left: 6px; vertical-align: middle;
+    }
+    .modal-code {
+      margin: 6px 0 12px; padding: 10px 14px; background: var(--panel-2);
+      border: 1px solid var(--line); border-radius: 6px;
+      font-family: "Cascadia Code", Consolas, monospace; font-size: 12px;
+      overflow-x: auto;
+    }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <header class="titlebar">
+      <span class="logo">M</span>
+      <span id="documentTitle">새 문서.md</span><span id="dirtyMark"></span>
+      <span style="margin-left:auto;opacity:.7">MD Desk v1.1.0</span>
+    </header>
+
+    <nav class="toolbar" aria-label="도구 모음">
+      <div class="menus">
+        <div class="menu"><button class="menu-button">파일</button><div class="menu-panel">
+          <button data-action="new">새 문서 <span class="shortcut">Ctrl+N</span></button>
+          <button data-action="open">파일 열기 <span class="shortcut">Ctrl+O</span></button>
+          <button data-action="save">저장 <span class="shortcut">Ctrl+S</span></button>
+          <button data-action="save-as">다른 이름으로 저장</button>
+        </div></div>
+        <div class="menu"><button class="menu-button">편집</button><div class="menu-panel">
+          <button data-action="undo">실행 취소 <span class="shortcut">Ctrl+Z</span></button>
+          <button data-action="find">찾기 <span class="shortcut">Ctrl+F</span></button>
+          <button data-action="select-all">전체 선택 <span class="shortcut">Ctrl+A</span></button>
+        </div></div>
+        <div class="menu"><button class="menu-button">보기</button><div class="menu-panel">
+          <button data-mode="preview">서식 보기 <span class="shortcut">Ctrl+1</span></button>
+          <button data-mode="split">나란히 보기 <span class="shortcut">Ctrl+2</span></button>
+          <button data-mode="edit">Markdown 편집 <span class="shortcut">Ctrl+3</span></button>
+          <button data-action="toggle-sidebar">왼쪽 메뉴 전환 <span class="shortcut">Ctrl+B</span></button>
+          <button data-action="theme">밝기 전환</button>
+        </div></div>
+        <div class="menu"><button class="menu-button">도움말</button><div class="menu-panel">
+          <button data-action="shortcuts">단축키 안내</button>
+          <button data-action="mermaid-guide">Mermaid 다이어그램 안내</button>
+          <button data-action="about">MD Desk 정보 <span class="modal-badge">v1.1.0</span></button>
+        </div></div>
+      </div>
+      <button class="tool" data-action="open" title="Markdown 파일 열기 (Ctrl+O)">📂</button>
+      <button class="tool" data-action="save" title="저장 (Ctrl+S)">💾</button>
+      <span class="separator"></span>
+      <button class="tool secondary" data-format="bold" title="굵게"><b>B</b></button>
+      <button class="tool secondary" data-format="italic" title="기울임"><i>I</i></button>
+      <button class="tool secondary" data-format="heading" title="제목">H</button>
+      <button class="tool secondary" data-format="link" title="링크">🔗</button>
+      <button class="tool secondary" data-format="list" title="목록">☷</button>
+      <button class="nav-toggle active" data-action="toggle-sidebar" aria-pressed="true" title="네비게이션 보기/숨기기 (Ctrl+B)">☰ <span>목차</span></button>
+      <div class="mode-switch" aria-label="보기 방식">
+        <button class="mode-button active" data-mode="preview" title="서식 보기 (Ctrl+1)">◉ <span>서식 보기</span></button>
+        <button class="mode-button" data-mode="split" title="나란히 보기 (Ctrl+2)">◫ <span>나란히</span></button>
+        <button class="mode-button" data-mode="edit" title="Markdown 편집 (Ctrl+3)">⌨ <span>Markdown</span></button>
+      </div>
+      <button class="tool" data-action="theme" title="밝은/어두운 화면">☾</button>
+    </nav>
+
+    <div class="workspace">
+      <aside class="sidebar">
+        <div class="side-head"><strong>내비게이션</strong><button data-action="toggle-sidebar" title="닫기">×</button></div>
+        <div class="search-wrap"><input id="outlineSearch" type="search" placeholder="제목을 검색하세요…"></div>
+        <div class="outline-label">문서 제목</div>
+        <div id="outline"></div>
+      </aside>
+      <div class="resize-handle" title="드래그하여 메뉴 폭 조절"></div>
+      <main class="main">
+        <div class="drop-zone">여기에 Markdown 파일을 놓으세요</div>
+        <div class="pane-grid" data-mode="preview">
+          <section class="editor-pane"><textarea id="editor" spellcheck="false" aria-label="Markdown 편집기"></textarea></section>
+          <section class="preview-pane"><article id="preview" spellcheck="true"></article></section>
+        </div>
+        <button class="to-top" data-action="to-top" title="문서 맨 위로 이동 (Ctrl+Home)">↑ 맨 위로</button>
+      </main>
+    </div>
+
+    <footer class="statusbar">
+      <span id="statusMessage">파일을 끌어다 놓거나 📂 버튼을 누르세요</span>
+      <span id="wordCount">0자 · 0줄</span><span>UTF-8</span><span>Markdown</span>
+    </footer>
+  </div>
+  <div class="toast" role="status"></div>
+  <div id="modalBackdrop" class="modal-backdrop">
+    <div class="modal" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
+      <div class="modal-header">
+        <h3 id="modalTitle">도움말</h3>
+        <button id="modalClose" class="modal-close" title="닫기 (Esc)">×</button>
+      </div>
+      <div id="modalBody" class="modal-body"></div>
+      <div class="modal-footer">
+        <button id="modalConfirmBtn" class="modal-confirm-btn" type="button">닫기</button>
+      </div>
+    </div>
+  </div>
+  <input id="fileInput" type="file" accept=".md,.markdown,.mdown,.txt,text/markdown,text/plain" hidden>
+
+  <script>
+    (() => {
+      'use strict';
+      const $ = (s, root = document) => root.querySelector(s);
+      const $$ = (s, root = document) => [...root.querySelectorAll(s)];
+      const editor = $('#editor');
+      const preview = $('#preview');
+      const paneGrid = $('.pane-grid');
+      const outline = $('#outline');
+      const fileInput = $('#fileInput');
+      let currentName = '새 문서.md';
+      let fileHandle = null;
+      let dirty = false;
+      let renderTimer;
+      if ('scrollRestoration' in history) history.scrollRestoration = 'manual';
+
+      const starter = `# Markdown 문서를 열어보세요
+
+이 화면에 **.md 파일을 드래그해서 놓거나**, 위의 📂 버튼을 누르세요.
+
+## 빠른 사용법
+
+- 상단의 **서식 보기 / 나란히 / Markdown** 버튼으로 즉시 전환합니다.
+- 왼쪽 목차를 누르면 원하는 제목으로 이동합니다.
+- Markdown 화면에서 내용을 수정한 뒤 \`Ctrl + S\`로 저장합니다.
+- 메뉴와 편집 영역의 크기는 자유롭게 조절할 수 있습니다.
+
+## 📊 Mermaid 다이어그램 지원 (v1.1.0)
+
+\`\`\`mermaid
+graph LR
+    A[Markdown 작성] --> B[코드블록 \`\`\`mermaid]
+    B --> C{실시간 렌더링}
+    C -->|성공| D[🎨 그래픽 SVG 다이어그램]
+    C -->|테마 전환| E[🌓 다크/라이트 자동 동기화]
+\`\`\`
+
+> 설치 없이 이 HTML 파일 하나만으로 동작합니다.
+`;
+
+      const escapeHtml = value => String(value).replace(/[&<>"']/g, ch => ({
+        '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;'
+      })[ch]);
+      const slugify = (text, used) => {
+        const base = text.toLowerCase().replace(/<[^>]*>/g, '').replace(/[^\p{L}\p{N}\s-]/gu, '').trim().replace(/\s+/g, '-') || 'section';
+        let slug = base, i = 2;
+        while (used.has(slug)) slug = `${base}-${i++}`;
+        used.add(slug); return slug;
+      };
+      const safeUrl = raw => {
+        const url = raw.trim();
+        if (/^(https?:|mailto:|#|\.\/|\.\.\/|data:image\/(png|gif|jpeg|webp);base64,)/i.test(url)) return escapeHtml(url);
+        if (!/:|^\/\//.test(url)) return escapeHtml(url);
+        return '#';
+      };
+      const inline = text => {
+        let value = escapeHtml(text);
+        const code = [];
+        value = value.replace(/`([^`]+)`/g, (_, v) => { code.push(`<code>${v}</code>`); return `\u0000${code.length - 1}\u0000`; });
+        value = value.replace(/!\[([^\]]*)\]\(([^\s)]+)(?:\s+&quot;([^&]*)&quot;)?\)/g, (_, alt, url, title) => `<img src="${safeUrl(url)}" alt="${alt}"${title ? ` title="${title}"` : ''}>`);
+        value = value.replace(/\[([^\]]+)\]\(([^\s)]+)(?:\s+&quot;([^&]*)&quot;)?\)/g, (_, label, url, title) => `<a href="${safeUrl(url)}"${title ? ` title="${title}"` : ''} target="_blank" rel="noopener">${label}</a>`);
+        value = value.replace(/\*\*([^*]+)\*\*|__([^_]+)__/g, '<strong>$1$2</strong>');
+        value = value.replace(/~~([^~]+)~~/g, '<del>$1</del>');
+        value = value.replace(/(^|[^*])\*([^*\n]+)\*/g, '$1<em>$2</em>');
+        value = value.replace(/  \n/g, '<br>');
+        value = value.replace(/\u0000(\d+)\u0000/g, (_, i) => code[+i]);
+        return value;
+      };
+
+      function markdownToHtml(md) {
+        const lines = md.replace(/\r\n?/g, '\n').split('\n');
+        const html = [], used = new Set();
+        let i = 0, paragraph = [], listType = '', inBlockquote = false;
+        const flushParagraph = () => { if (paragraph.length) { html.push(`<p>${inline(paragraph.join('\n'))}</p>`); paragraph = []; } };
+        const closeList = () => { if (listType) { html.push(`</${listType}>`); listType = ''; } };
+        const closeQuote = () => { if (inBlockquote) { flushParagraph(); html.push('</blockquote>'); inBlockquote = false; } };
+
+        while (i < lines.length) {
+          let line = lines[i];
+          if (/^```/.test(line)) {
+            flushParagraph(); closeList(); closeQuote();
+            const lang = line.slice(3).trim(); const code = []; i++;
+            while (i < lines.length && !/^```/.test(lines[i])) code.push(lines[i++]);
+            const codeText = code.join('\n');
+            if (lang.toLowerCase() === 'mermaid') {
+              const mId = 'mmd-' + Math.random().toString(36).slice(2, 9);
+              html.push(`<div class="mermaid-block" id="${mId}"><div class="mermaid-loading">⏳ 다이어그램 렌더링 중...</div><pre class="mermaid-raw" style="display:none;"><code>${escapeHtml(codeText)}</code></pre></div>`);
+            } else {
+              html.push(`<pre><code${lang ? ` class="language-${escapeHtml(lang)}"` : ''}>${escapeHtml(codeText)}</code></pre>`);
+            }
+            i++; continue;
+          }
+          const heading = line.match(/^(#{1,6})\s+(.+?)\s*#*$/);
+          if (heading) {
+            flushParagraph(); closeList(); closeQuote();
+            const level = heading[1].length, raw = heading[2], id = slugify(raw, used);
+            html.push(`<h${level} id="${id}">${inline(raw)}</h${level}>`); i++; continue;
+          }
+          if (/^\s*(---+|___+|\*\*\*+)\s*$/.test(line)) { flushParagraph(); closeList(); closeQuote(); html.push('<hr>'); i++; continue; }
+          if (line.includes('|') && i + 1 < lines.length && /^\s*\|?\s*:?-{3,}/.test(lines[i + 1])) {
+            flushParagraph(); closeList(); closeQuote();
+            const cells = value => value.trim().replace(/^\||\|$/g, '').split('|').map(v => v.trim());
+            const heads = cells(line); i += 2; const rows = [];
+            while (i < lines.length && lines[i].includes('|') && lines[i].trim()) rows.push(cells(lines[i++]));
+            html.push(`<table><thead><tr>${heads.map(v => `<th>${inline(v)}</th>`).join('')}</tr></thead><tbody>${rows.map(row => `<tr>${row.map(v => `<td>${inline(v)}</td>`).join('')}</tr>`).join('')}</tbody></table>`); continue;
+          }
+          const list = line.match(/^\s*([-+*]|\d+\.)\s+(.+)$/);
+          if (list) {
+            flushParagraph(); closeQuote(); const type = /\d/.test(list[1]) ? 'ol' : 'ul';
+            if (listType !== type) { closeList(); html.push(`<${type}>`); listType = type; }
+            const item = list[2];
+            const task = item.match(/^\[([ xX])\]\s*(.*)$/);
+            if (task) {
+              const checked = task[1] !== ' ' ? ' checked' : '';
+              html.push(`<li class="task-item"><input type="checkbox" disabled${checked}>${inline(task[2])}</li>`);
+            } else {
+              html.push(`<li>${inline(item)}</li>`);
+            }
+            i++; continue;
+          }
+          if (/^>\s?/.test(line)) {
+            flushParagraph(); closeList(); if (!inBlockquote) { html.push('<blockquote>'); inBlockquote = true; }
+            paragraph.push(line.replace(/^>\s?/, '')); i++; continue;
+          }
+          if (!line.trim()) { flushParagraph(); closeList(); closeQuote(); i++; continue; }
+          if (inBlockquote && !/^>/.test(line)) closeQuote();
+          paragraph.push(line); i++;
+        }
+        flushParagraph(); closeList(); closeQuote();
+        return html.join('\n');
+      }
+
+      let mermaidLoading = false;
+      let mermaidRenderSeq = 0;
+
+      async function ensureMermaidLoaded() {
+        if (window.mermaid) return true;
+        if (mermaidLoading) {
+          for (let k = 0; k < 60; k++) {
+            await new Promise(r => setTimeout(r, 100));
+            if (window.mermaid) return true;
+          }
+          return !!window.mermaid;
+        }
+        mermaidLoading = true;
+
+        const loadScript = src => new Promise((resolve, reject) => {
+          const s = document.createElement('script');
+          s.src = src;
+          s.async = true;
+          s.onload = () => resolve();
+          s.onerror = err => reject(err);
+          document.head.appendChild(s);
+        });
+
+        try {
+          await loadScript('https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js');
+        } catch (_) {
+          try {
+            await loadScript('https://cdnjs.cloudflare.com/ajax/libs/mermaid/10.9.1/mermaid.min.js');
+          } catch (e) {
+            mermaidLoading = false;
+            return false;
+          }
+        }
+
+        if (window.mermaid) {
+          try {
+            window.mermaid.initialize({
+              startOnLoad: false,
+              securityLevel: 'loose',
+              theme: document.documentElement.dataset.theme === 'dark' ? 'dark' : 'default',
+              fontFamily: 'inherit'
+            });
+          } catch (_) {}
+          mermaidLoading = false;
+          return true;
+        }
+        mermaidLoading = false;
+        return false;
+      }
+
+      async function renderMermaidBlocks() {
+        const blocks = [...preview.querySelectorAll('.mermaid-block')];
+        if (!blocks.length) return;
+
+        const seq = ++mermaidRenderSeq;
+        const loaded = await ensureMermaidLoaded();
+
+        if (seq !== mermaidRenderSeq) return;
+
+        if (!loaded) {
+          blocks.forEach(block => {
+            const rawEl = block.querySelector('.mermaid-raw code');
+            const source = rawEl ? rawEl.textContent : (block.dataset.source || '');
+            block.innerHTML = `
+              <div class="mermaid-fallback-box">
+                <div class="mermaid-fallback-head">
+                  <span>📊 Mermaid 다이어그램</span>
+                  <span class="mermaid-offline-badge">오프라인 / 원본 표시</span>
+                </div>
+                <pre class="mermaid-fallback-code"><code>${escapeHtml(source)}</code></pre>
+              </div>
+              <pre class="mermaid-raw" style="display:none;"><code>${escapeHtml(source)}</code></pre>`;
+          });
+          return;
+        }
+
+        const currentTheme = document.documentElement.dataset.theme === 'dark' ? 'dark' : 'default';
+        try {
+          window.mermaid.initialize({
+            startOnLoad: false,
+            securityLevel: 'loose',
+            theme: currentTheme,
+            fontFamily: 'inherit'
+          });
+        } catch (_) {}
+
+        for (let idx = 0; idx < blocks.length; idx++) {
+          if (seq !== mermaidRenderSeq) return;
+          const block = blocks[idx];
+          const rawEl = block.querySelector('.mermaid-raw code');
+          const source = (rawEl ? rawEl.textContent : (block.dataset.source || '')).trim();
+          if (!source) {
+            block.innerHTML = '<div class="mermaid-loading">비어있는 다이어그램입니다.</div>';
+            continue;
+          }
+          const renderId = 'mmd-svg-' + Math.random().toString(36).slice(2, 9);
+          try {
+            const { svg } = await window.mermaid.render(renderId, source);
+            if (seq !== mermaidRenderSeq) return;
+            block.innerHTML = `<div class="mermaid-svg-wrapper">${svg}</div><pre class="mermaid-raw" style="display:none;"><code>${escapeHtml(source)}</code></pre>`;
+          } catch (err) {
+            if (seq !== mermaidRenderSeq) return;
+            block.innerHTML = `
+              <div class="mermaid-error-box">
+                <div class="mermaid-error-head">⚠️ Mermaid 문법 오류</div>
+                <div class="mermaid-error-detail">${escapeHtml(err.message || String(err))}</div>
+                <pre class="mermaid-fallback-code"><code>${escapeHtml(source)}</code></pre>
+              </div>
+              <pre class="mermaid-raw" style="display:none;"><code>${escapeHtml(source)}</code></pre>`;
+          }
+        }
+      }
+
+      function render() {
+        preview.innerHTML = markdownToHtml(editor.value);
+        buildOutline();
+        updateCount();
+        renderMermaidBlocks();
+      }
+
+      function updateCount() {
+        const lines = editor.value ? editor.value.split(/\n/).length : 0;
+        $('#wordCount').textContent = `${editor.value.length.toLocaleString()}자 · ${lines.toLocaleString()}줄`;
+      }
+
+      function htmlToMarkdown(root) {
+        const clean = value => value.replace(/[ \t]+\n/g, '\n').replace(/\n{3,}/g, '\n\n');
+        const walk = node => {
+          if (node.nodeType === Node.TEXT_NODE) return node.nodeValue.replace(/\u00a0/g, ' ');
+          if (node.nodeType !== Node.ELEMENT_NODE) return '';
+          if (node.classList?.contains('mermaid-block')) {
+            const raw = node.querySelector('.mermaid-raw code')?.textContent || node.querySelector('.mermaid-fallback-code code')?.textContent || '';
+            return `\`\`\`mermaid\n${raw.trim()}\n\`\`\`\n\n`;
+          }
+          const tag = node.tagName.toLowerCase();
+          const children = () => [...node.childNodes].map(walk).join('');
+          if (tag === 'br') return '\n';
+          if (tag === 'strong' || tag === 'b') return `**${children()}**`;
+          if (tag === 'em' || tag === 'i') return `*${children()}*`;
+          if (tag === 'del' || tag === 's' || tag === 'strike') return `~~${children()}~~`;
+          if (tag === 'code' && node.parentElement?.tagName !== 'PRE') return `\`${node.textContent}\``;
+          if (tag === 'a') return `[${children()}](${node.getAttribute('href') || '#'})`;
+          if (tag === 'img') return `![${node.getAttribute('alt') || ''}](${node.getAttribute('src') || ''})`;
+          if (/^h[1-6]$/.test(tag)) return `${'#'.repeat(+tag[1])} ${children().trim()}\n\n`;
+          if (tag === 'p') return `${children().trim()}\n\n`;
+          if (tag === 'hr') return '---\n\n';
+          if (tag === 'blockquote') return `${clean(children()).trim().split('\n').map(line => `> ${line}`).join('\n')}\n\n`;
+          if (tag === 'pre') {
+            const code = node.querySelector('code');
+            const lang = code?.className.match(/language-([\w-]+)/)?.[1] || '';
+            return `\`\`\`${lang}\n${(code || node).textContent.replace(/\n$/, '')}\n\`\`\`\n\n`;
+          }
+          if (tag === 'input' && node.type === 'checkbox') return node.checked ? '[x] ' : '[ ] ';
+          if (tag === 'ul' || tag === 'ol') {
+            const ordered = tag === 'ol';
+            return [...node.children].filter(child => child.tagName === 'LI').map((li, index) => {
+              const prefix = ordered ? `${index + 1}. ` : '- ';
+              const content = [...li.childNodes].filter(child => !['UL','OL'].includes(child.tagName)).map(walk).join('').trim();
+              const nested = [...li.children].filter(child => ['UL','OL'].includes(child.tagName)).map(walk).join('').trim();
+              return prefix + content + (nested ? `\n${nested.split('\n').map(line => `  ${line}`).join('\n')}` : '');
+            }).join('\n') + '\n\n';
+          }
+          if (tag === 'table') {
+            const rows = [...node.querySelectorAll('tr')].map(row => [...row.children].map(cell => cell.textContent.trim().replace(/\|/g, '\\|')));
+            if (!rows.length) return '';
+            return `| ${rows[0].join(' | ')} |\n| ${rows[0].map(() => '---').join(' | ')} |\n${rows.slice(1).map(row => `| ${row.join(' | ')} |`).join('\n')}\n\n`;
+          }
+          if (tag === 'div') return `${children()}\n`;
+          return children();
+        };
+        return clean([...root.childNodes].map(walk).join('')).trimEnd() + '\n';
+      }
+
+      let activeHeadingTarget = null;
+
+      function updateActiveOutline(targetId, targetText) {
+        $$('.outline-item').forEach(btn => {
+          const match = (targetId && btn.dataset.targetId === targetId) ||
+                        (targetText && btn.dataset.targetText === targetText);
+          btn.classList.toggle('active', !!match);
+        });
+      }
+
+      function scrollToHeadingInEditor(targetText) {
+        if (!editor || !targetText) return;
+        const text = editor.value;
+        const clean = targetText.trim();
+        const lines = text.split('\n');
+        let charIndex = 0;
+        let matchedLine = -1;
+        for (let i = 0; i < lines.length; i++) {
+          const line = lines[i];
+          const m = line.match(/^#{1,6}\s+(.+?)\s*#*$/);
+          if (m && m[1].trim() === clean) {
+            matchedLine = i;
+            break;
+          }
+          charIndex += line.length + 1;
+        }
+        if (matchedLine !== -1) {
+          editor.selectionStart = charIndex;
+          editor.selectionEnd = charIndex;
+          const totalLines = lines.length;
+          const lineHeight = editor.scrollHeight / (totalLines || 1);
+          editor.scrollTo({
+            top: Math.max(0, matchedLine * lineHeight - 60),
+            behavior: 'smooth'
+          });
+        }
+      }
+
+      function scrollToHeading(targetId, targetText) {
+        activeHeadingTarget = { targetId, targetText };
+        const currentMode = paneGrid.dataset.mode;
+
+        // 편집 모드일 경우 서식 보기 모드로 전환하되 기존 스크롤 복원은 건너뜀
+        if (currentMode === 'edit') {
+          setMode('preview', true);
+        }
+
+        const findHeading = () => {
+          let h = targetId ? preview.querySelector(`#${CSS.escape(targetId)}`) : null;
+          if (!h && targetText) {
+            const clean = targetText.trim();
+            h = [...preview.querySelectorAll('h1,h2,h3,h4,h5,h6')].find(el => el.textContent.trim() === clean);
+          }
+          return h;
+        };
+
+        const performScroll = () => {
+          const h = findHeading();
+          if (h) {
+            h.classList.remove('heading-highlight');
+            void h.offsetWidth;
+            h.classList.add('heading-highlight');
+
+            const scroller = $('.preview-pane');
+            if (scroller) {
+              const scrollerRect = scroller.getBoundingClientRect();
+              const hRect = h.getBoundingClientRect();
+              const targetTop = scroller.scrollTop + (hRect.top - scrollerRect.top) - 24;
+              scroller.scrollTo({ top: Math.max(0, targetTop), behavior: 'smooth' });
+            }
+            try {
+              h.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            } catch (_) {}
+          }
+          scrollToHeadingInEditor(targetText);
+          updateActiveOutline(targetId, targetText);
+        };
+
+        requestAnimationFrame(() => {
+          requestAnimationFrame(performScroll);
+        });
+      }
+
+      let scrollSpyTimer;
+      let isDocumentLoading = false;
+
+      function updateScrollSpy() {
+        if (isDocumentLoading || paneGrid.dataset.mode === 'edit') return;
+        clearTimeout(scrollSpyTimer);
+        scrollSpyTimer = setTimeout(() => {
+          if (isDocumentLoading) return;
+          const scroller = $('.preview-pane');
+          if (!scroller) return;
+          const scrollerTop = scroller.getBoundingClientRect().top;
+          const headings = [...preview.querySelectorAll('h1,h2,h3,h4,h5,h6')];
+          let current = null;
+          for (let i = 0; i < headings.length; i++) {
+            const h = headings[i];
+            const rect = h.getBoundingClientRect();
+            if (rect.top - scrollerTop <= 110) {
+              current = h;
+            } else {
+              break;
+            }
+          }
+          if (!current && headings.length) current = headings[0];
+          if (current) {
+            updateActiveOutline(current.id, current.textContent.trim());
+          }
+        }, 80);
+      }
+
+      function buildOutline() {
+        const query = $('#outlineSearch').value.trim().toLowerCase();
+        const headings = [...preview.querySelectorAll('h1,h2,h3,h4,h5,h6')].filter(h => h.textContent.toLowerCase().includes(query));
+        outline.replaceChildren();
+        if (!headings.length) {
+          const empty = document.createElement('div'); empty.className = 'outline-empty';
+          empty.textContent = query ? '일치하는 제목이 없습니다.' : '문서에 제목이 없습니다.'; outline.append(empty); return;
+        }
+        headings.forEach(h => {
+          const button = document.createElement('button'); button.className = 'outline-item';
+          button.style.paddingLeft = `${8 + (+h.tagName[1] - 1) * 15}px`; button.textContent = h.textContent;
+          button.title = h.textContent;
+          button.dataset.targetId = h.id;
+          button.dataset.targetText = h.textContent.trim();
+          button.addEventListener('click', (e) => {
+            e.preventDefault();
+            scrollToHeading(h.id, h.textContent.trim());
+          });
+          outline.append(button);
+        });
+        updateScrollSpy();
+      }
+
+      function setMode(mode, preserveScroll = false) {
+        const previousMode = paneGrid.dataset.mode;
+        const previewScroller = $('.preview-pane');
+        const source = previousMode === 'preview' ? previewScroller : editor;
+        const sourceMax = Math.max(0, source.scrollHeight - source.clientHeight);
+        const scrollRatio = sourceMax ? source.scrollTop / sourceMax : 0;
+
+        window.scrollTo(0, 0);
+        paneGrid.dataset.mode = mode;
+        preview.contentEditable = mode === 'preview' ? 'true' : 'false';
+        preview.setAttribute('aria-label', mode === 'preview' ? '서식 편집기' : 'Markdown 미리보기');
+        $$('.mode-button').forEach(b => b.classList.toggle('active', b.dataset.mode === mode));
+        localStorage.setItem('mdDeskMode', mode);
+
+        if (!preserveScroll && !isDocumentLoading) {
+          const restorePosition = () => {
+            if (isDocumentLoading) return;
+            if (mode === 'edit' || mode === 'split') {
+              const position = Math.min(editor.value.length, Math.round(editor.value.length * scrollRatio));
+              editor.selectionStart = editor.selectionEnd = position;
+              editor.focus({preventScroll: true});
+              editor.scrollTop = scrollRatio * Math.max(0, editor.scrollHeight - editor.clientHeight);
+            } else {
+              previewScroller.scrollTop = scrollRatio * Math.max(0, previewScroller.scrollHeight - previewScroller.clientHeight);
+            }
+            updateTopButton();
+            updateScrollSpy();
+          };
+          if (mode !== previousMode) requestAnimationFrame(() => requestAnimationFrame(restorePosition));
+          else { updateTopButton(); updateScrollSpy(); }
+        } else {
+          updateTopButton();
+          updateScrollSpy();
+        }
+      }
+
+      function setDirty(value) { dirty = value; $('#dirtyMark').textContent = dirty ? ' •' : ''; }
+      function setTitle(name) { currentName = name || '문서.md'; $('#documentTitle').textContent = currentName; document.title = `${currentName} - MD Desk`; }
+      function toast(message) { const el = $('.toast'); el.textContent = message; el.classList.add('show'); clearTimeout(el._timer); el._timer = setTimeout(() => el.classList.remove('show'), 2200); }
+
+      async function readFile(file) {
+        if (!file) return;
+        if (!/\.(md|markdown|mdown|txt)$/i.test(file.name)) return toast('Markdown 또는 텍스트 파일만 열 수 있습니다.');
+        const text = await file.text();
+        $('#outlineSearch').value = '';
+        editor.value = text;
+        setTitle(file.name);
+        setDirty(false);
+        render();
+        resetScrolls();
+        if (window.chrome?.webview) window.chrome.webview.postMessage({type:'clearPath'});
+        $('#statusMessage').textContent = `${file.name} 열림`;
+      }
+
+      function resetScrolls() {
+        isDocumentLoading = true;
+        clearTimeout(scrollSpyTimer);
+
+        const previewScroller = $('.preview-pane');
+        const prevBehavior = previewScroller.style.scrollBehavior;
+        previewScroller.style.scrollBehavior = 'auto';
+
+        const doReset = () => {
+          window.scrollTo(0, 0);
+          if (document.documentElement) document.documentElement.scrollTop = 0;
+          if (document.body) document.body.scrollTop = 0;
+
+          previewScroller.scrollTop = 0;
+          previewScroller.scrollLeft = 0;
+          if ('scrollTo' in previewScroller) {
+            previewScroller.scrollTo({ top: 0, left: 0, behavior: 'instant' });
+          }
+
+          editor.scrollTop = 0;
+          editor.scrollLeft = 0;
+          editor.selectionStart = 0;
+          editor.selectionEnd = 0;
+          if ('scrollTo' in editor) {
+            editor.scrollTo({ top: 0, left: 0, behavior: 'instant' });
+          }
+
+          outline.scrollTop = 0;
+          outline.scrollLeft = 0;
+
+          activeHeadingTarget = null;
+          $$('.heading-highlight').forEach(el => el.classList.remove('heading-highlight'));
+          updateTopButton();
+        };
+
+        doReset();
+
+        requestAnimationFrame(() => {
+          doReset();
+          requestAnimationFrame(() => {
+            doReset();
+            previewScroller.style.scrollBehavior = prevBehavior;
+            setTimeout(() => {
+              isDocumentLoading = false;
+              const headings = [...preview.querySelectorAll('h1,h2,h3,h4,h5,h6')];
+              if (headings.length > 0) {
+                updateActiveOutline(headings[0].id, headings[0].textContent.trim());
+              } else {
+                updateActiveOutline(null, null);
+              }
+            }, 60);
+          });
+        });
+      }
+
+      function updateTopButton() {
+        const activeScroll = paneGrid.dataset.mode === 'preview' ? $('.preview-pane').scrollTop : editor.scrollTop;
+        $('.to-top').classList.toggle('show', activeScroll > 240);
+      }
+      async function openFile() {
+        if (window.chrome?.webview) {
+          window.chrome.webview.postMessage({type:'open'});
+          return;
+        }
+        if ('showOpenFilePicker' in window) {
+          try {
+            const [handle] = await window.showOpenFilePicker({types:[{description:'Markdown', accept:{'text/markdown':['.md','.markdown','.mdown'], 'text/plain':['.txt']}}], multiple:false});
+            fileHandle = handle; await readFile(await handle.getFile()); return;
+          } catch (error) { if (error.name !== 'AbortError') toast('파일을 열지 못했습니다.'); return; }
+        }
+        fileInput.click();
+      }
+      function downloadFile(name = currentName) {
+        const blob = new Blob([editor.value], {type:'text/markdown;charset=utf-8'}); const url = URL.createObjectURL(blob);
+        const a = document.createElement('a'); a.href = url; a.download = name; a.click(); setTimeout(() => URL.revokeObjectURL(url), 1000);
+      }
+      async function saveFile(saveAs = false) {
+        if (window.chrome?.webview) {
+          window.chrome.webview.postMessage({type:'save', name:currentName, content:editor.value, saveAs});
+          return;
+        }
+        if ('showSaveFilePicker' in window && (saveAs || !fileHandle)) {
+          try { fileHandle = await window.showSaveFilePicker({suggestedName:currentName, types:[{description:'Markdown', accept:{'text/markdown':['.md']}}]}); }
+          catch (error) { if (error.name !== 'AbortError') toast('저장 위치를 열지 못했습니다.'); return; }
+        }
+        if (fileHandle) {
+          try { const writable = await fileHandle.createWritable(); await writable.write(editor.value); await writable.close(); setTitle(fileHandle.name); setDirty(false); toast('저장했습니다.'); return; }
+          catch (error) { toast('원본 저장이 불가해 다운로드합니다.'); }
+        }
+        downloadFile(); setDirty(false); toast('Markdown 파일을 다운로드했습니다.');
+      }
+
+      function wrapSelection(before, after = before, placeholder = '텍스트') {
+        setMode('edit'); const start = editor.selectionStart, end = editor.selectionEnd;
+        const selected = editor.value.slice(start, end) || placeholder;
+        editor.setRangeText(before + selected + after, start, end, 'select');
+        editor.selectionStart = start + before.length; editor.selectionEnd = start + before.length + selected.length;
+        editor.dispatchEvent(new Event('input')); editor.focus();
+      }
+      function format(type) {
+        if (paneGrid.dataset.mode === 'preview') {
+          preview.focus();
+          if (type === 'bold') document.execCommand('bold');
+          if (type === 'italic') document.execCommand('italic');
+          if (type === 'heading') document.execCommand('formatBlock', false, 'h2');
+          if (type === 'list') document.execCommand('insertUnorderedList');
+          if (type === 'link') {
+            const url = prompt('연결할 주소를 입력하세요.', 'https://');
+            if (url) document.execCommand('createLink', false, url);
+          }
+          preview.dispatchEvent(new Event('input'));
+          return;
+        }
+        if (type === 'bold') wrapSelection('**');
+        if (type === 'italic') wrapSelection('*');
+        if (type === 'link') wrapSelection('[', '](https://)', '링크 제목');
+        if (type === 'heading') wrapSelection('## ', '', '제목');
+        if (type === 'list') wrapSelection('- ', '', '목록 항목');
+      }
+
+      function showModal(title, htmlContent) {
+        const backdrop = $('#modalBackdrop');
+        if (!backdrop) return;
+        $('#modalTitle').textContent = title;
+        $('#modalBody').innerHTML = htmlContent;
+        backdrop.classList.add('show');
+        backdrop.style.display = 'grid';
+      }
+
+      function closeModal() {
+        const backdrop = $('#modalBackdrop');
+        if (!backdrop) return;
+        backdrop.classList.remove('show');
+        backdrop.style.display = 'none';
+      }
+
+      async function action(name) {
+        $$('.menu').forEach(m => m.classList.remove('open'));
+        if (name === 'open') return openFile();
+        if (name === 'save') return saveFile(false);
+        if (name === 'save-as') return saveFile(true);
+        if (name === 'new') { if (dirty && !confirm('저장하지 않은 변경 내용이 있습니다. 새 문서를 만들까요?')) return; fileHandle = null; if (window.chrome?.webview) window.chrome.webview.postMessage({type:'clearPath'}); editor.value = ''; setTitle('새 문서.md'); setDirty(false); render(); setMode('edit'); resetScrolls(); }
+        if (name === 'toggle-sidebar') {
+          document.body.classList.toggle('sidebar-hidden');
+          const visible = !document.body.classList.contains('sidebar-hidden');
+          $$('.nav-toggle').forEach(button => {
+            button.classList.toggle('active', visible);
+            button.setAttribute('aria-pressed', String(visible));
+          });
+          localStorage.setItem('mdDeskSidebar', visible ? 'show' : 'hide');
+        }
+
+        if (name === 'theme') {
+          const next = document.documentElement.dataset.theme === 'dark' ? '' : 'dark';
+          document.documentElement.dataset.theme = next;
+          localStorage.setItem('mdDeskTheme', next);
+          renderMermaidBlocks();
+        }
+        if (name === 'undo') { if (paneGrid.dataset.mode === 'preview') { preview.focus(); document.execCommand('undo'); preview.dispatchEvent(new Event('input')); } else { setMode('edit'); document.execCommand('undo'); } }
+        if (name === 'find') { setMode('edit'); editor.focus(); toast('브라우저 찾기(Ctrl+F)로 문서 내용을 검색할 수 있습니다.'); }
+        if (name === 'select-all') {
+          if (paneGrid.dataset.mode === 'preview') {
+            const selection = getSelection(); const range = document.createRange(); range.selectNodeContents(preview);
+            selection.removeAllRanges(); selection.addRange(range); preview.focus();
+          } else { setMode('edit'); editor.select(); }
+        }
+        if (name === 'to-top') { resetScrolls(); editor.selectionStart = editor.selectionEnd = 0; }
+        if (name === 'shortcuts') {
+          showModal('단축키 안내', `
+            <table>
+              <thead><tr><th>단축키</th><th>기능 설명</th></tr></thead>
+              <tbody>
+                <tr><td><code>Ctrl + O</code></td><td>Markdown 파일 열기</td></tr>
+                <tr><td><code>Ctrl + S</code></td><td>파일 저장 (원본 파일 또는 다운로드)</td></tr>
+                <tr><td><code>Ctrl + N</code></td><td>새 문서 작성</td></tr>
+                <tr><td><code>Ctrl + 1</code></td><td>서식 보기 모드</td></tr>
+                <tr><td><code>Ctrl + 2</code></td><td>나란히 보기 모드 (에디터 + 서식 미리보기)</td></tr>
+                <tr><td><code>Ctrl + 3</code></td><td>Markdown 편집 모드</td></tr>
+                <tr><td><code>Ctrl + B</code></td><td>왼쪽 목차(내비게이션) 열기/닫기</td></tr>
+                <tr><td><code>Ctrl + F</code></td><td>문서 내용 검색 안내</td></tr>
+                <tr><td><code>Ctrl + Home</code></td><td>문서 맨 위로 즉시 이동</td></tr>
+              </tbody>
+            </table>
+          `);
+        }
+        if (name === 'mermaid-guide') {
+          showModal('Mermaid 다이어그램 안내', `
+            <p>코드 블록 언어를 <code>\`\`\`mermaid</code>로 지정하면 다이어그램이 실시간 그래픽 SVG로 자동 변환됩니다.</p>
+            
+            <h4>1. 순서도 (Flowchart)</h4>
+            <pre class="modal-code"><code>\`\`\`mermaid
+graph TD
+    A[시작] --> B{조건 확인}
+    B -->|성공| C[결과 처리]
+    B -->|실패| D[오류 알림]
+\`\`\`</code></pre>
+
+            <h4>2. 시퀀스 다이어그램 (Sequence)</h4>
+            <pre class="modal-code"><code>\`\`\`mermaid
+sequenceDiagram
+    사용자->>MDDesk: 문서 열기
+    MDDesk->>렌더러: 마크다운 및 다이어그램 파싱
+    렌더러-->>사용자: 그래픽 다이어그램 표시
+\`\`\`</code></pre>
+
+            <h4>3. 원형 차트 (Pie Chart)</h4>
+            <pre class="modal-code"><code>\`\`\`mermaid
+pie title 데이터 비율
+    "마크다운" : 70
+    "다이어그램" : 20
+    "기타" : 10
+\`\`\`</code></pre>
+            
+            <p style="margin-top:12px;font-size:12px;color:var(--muted);">※ 온라인 상태 시 최신 Mermaid 라이브러리가 자동 로드되며, 다크 모드 전환 시 다이어그램 테마도 함께 동기화됩니다.</p>
+          `);
+        }
+        if (name === 'about') {
+          showModal('MD Desk 정보', `
+            <div style="display:flex;align-items:center;gap:12px;margin-bottom:14px;">
+              <div style="width:40px;height:40px;background:var(--accent);color:#fff;border-radius:10px;display:grid;place-items:center;font-weight:900;font-size:20px;">M</div>
+              <div>
+                <strong style="font-size:16px;">MD Desk</strong>
+                <span class="modal-badge">v1.1.0</span>
+                <div style="font-size:12px;color:var(--muted);margin-top:2px;">설치 없이 사용하는 가벼운 Markdown 뷰어·편집기</div>
+              </div>
+            </div>
+            
+            <h4>🎉 v1.1.0 버전 업그레이드 내역</h4>
+            <ul style="padding-left:18px;margin:6px 0 16px;">
+              <li><strong>Mermaid 다이어그램 실시간 렌더링 지원</strong>: <code>\`\`\`mermaid</code> 코드 블록을 순서도, 시퀀스, 클래스, 상태도, 간트 차트 등 그래픽 SVG로 실시간 변환</li>
+              <li><strong>스마트 테마 연동</strong>: 밝은/어두운 화면(다크 모드) 전환 시 Mermaid 다이어그램 색상 자동 동기화</li>
+              <li><strong>안전한 오프라인 및 에러 방어</strong>: 오프라인이거나 문법 오류 시에도 문서가 깨지지 않고 원본 코드 보존</li>
+              <li><strong>모달 도움말 시스템</strong>: 단축키 및 Mermaid 작성법을 직관적으로 확인 가능한 팝업 제공</li>
+              <li><strong>런타임 호환성 개선</strong>: 최신 WebView2 런타임 환경에 최적화된 안정적인 초기화 파이프라인 적용</li>
+            </ul>
+
+            <h4>기본 기능 (v1.0.0)</h4>
+            <ul style="padding-left:18px;margin:6px 0;">
+              <li>서식 보기 / 나란히 보기 / Markdown 편집 3종 모드 전환</li>
+              <li>문서 제목 자동 목차(헤딩) 및 스크롤 위치 감지(ScrollSpy)</li>
+              <li>단일 실행 파일(.exe) 및 단일 HTML 독립 구동</li>
+            </ul>
+          `);
+        }
+      }
+
+      editor.addEventListener('input', () => { setDirty(true); clearTimeout(renderTimer); renderTimer = setTimeout(render, 100); });
+      preview.addEventListener('input', () => {
+        if (paneGrid.dataset.mode !== 'preview') return;
+        editor.value = htmlToMarkdown(preview);
+        setDirty(true); buildOutline(); updateCount();
+        $('#statusMessage').textContent = '서식 화면에서 편집 중';
+      });
+      editor.addEventListener('scroll', updateTopButton);
+      $('.preview-pane').addEventListener('scroll', () => {
+        updateTopButton();
+        updateScrollSpy();
+      });
+      editor.addEventListener('keydown', e => {
+        if (e.key === 'Tab') { e.preventDefault(); const start = editor.selectionStart; editor.setRangeText('  ', start, editor.selectionEnd, 'end'); editor.dispatchEvent(new Event('input')); }
+      });
+      $('#outlineSearch').addEventListener('input', buildOutline);
+      fileInput.addEventListener('change', async () => { fileHandle = null; await readFile(fileInput.files[0]); fileInput.value = ''; });
+      $$('[data-action]').forEach(b => b.addEventListener('click', () => action(b.dataset.action)));
+      $$('button[data-mode]').forEach(b => b.addEventListener('click', () => { setMode(b.dataset.mode); $$('.menu').forEach(m => m.classList.remove('open')); }));
+      $$('[data-format]').forEach(b => b.addEventListener('mousedown', e => { if (paneGrid.dataset.mode === 'preview') e.preventDefault(); }));
+      $$('[data-format]').forEach(b => b.addEventListener('click', () => format(b.dataset.format)));
+      $$('.menu-button').forEach(b => b.addEventListener('click', e => { e.stopPropagation(); const menu = b.parentElement; $$('.menu').filter(m => m !== menu).forEach(m => m.classList.remove('open')); menu.classList.toggle('open'); }));
+      $('#modalClose')?.addEventListener('click', closeModal);
+      $('#modalConfirmBtn')?.addEventListener('click', closeModal);
+      $('#modalBackdrop')?.addEventListener('click', e => {
+        if (e.target === $('#modalBackdrop')) closeModal();
+      });
+      document.addEventListener('click', () => $$('.menu').forEach(m => m.classList.remove('open')));
+      window.addEventListener('keydown', e => {
+        if (e.key === 'Escape') {
+          const backdrop = $('#modalBackdrop');
+          if (backdrop && (backdrop.classList.contains('show') || backdrop.style.display === 'grid')) {
+            e.preventDefault();
+            closeModal();
+            return;
+          }
+        }
+        if (!(e.ctrlKey || e.metaKey)) return;
+        const key = e.key.toLowerCase();
+        if (['o','s','n','1','2','3','b','home'].includes(key)) e.preventDefault();
+        if (key === 'o') action('open'); if (key === 's') action('save'); if (key === 'n') action('new');
+        if (key === '1') setMode('preview'); if (key === '2') setMode('split'); if (key === '3') setMode('edit'); if (key === 'b') action('toggle-sidebar');
+        if (key === 'home') action('to-top');
+      });
+      window.addEventListener('beforeunload', e => { if (dirty) { e.preventDefault(); e.returnValue = ''; } });
+      let dragDepth = 0;
+      window.addEventListener('dragenter', e => { e.preventDefault(); dragDepth++; document.body.classList.add('dragging'); });
+      window.addEventListener('dragover', e => e.preventDefault());
+      window.addEventListener('dragleave', () => { if (--dragDepth <= 0) { dragDepth = 0; document.body.classList.remove('dragging'); } });
+      window.addEventListener('drop', async e => { e.preventDefault(); dragDepth = 0; document.body.classList.remove('dragging'); fileHandle = null; await readFile(e.dataTransfer.files[0]); });
+
+      const handle = $('.resize-handle'); let resizing = false;
+      handle.addEventListener('pointerdown', e => { resizing = true; handle.setPointerCapture(e.pointerId); });
+      handle.addEventListener('pointermove', e => { if (resizing) document.documentElement.style.setProperty('--sidebar-width', `${Math.max(190, Math.min(480, e.clientX))}px`); });
+      handle.addEventListener('pointerup', () => resizing = false);
+
+      window.mdDeskOpenText = (name, text) => {
+        fileHandle = null;
+        $('#outlineSearch').value = '';
+        editor.value = String(text ?? '');
+        setTitle(name || '문서.md');
+        setDirty(false);
+        render();
+        resetScrolls();
+        $('#statusMessage').textContent = `${name} 열림`;
+      };
+
+      // 본문 내 마크다운 링크 및 앵커 링크 클릭 처리
+      preview.addEventListener('click', e => {
+        const link = e.target.closest('a');
+        if (!link) return;
+        const href = link.getAttribute('href');
+        if (!href) return;
+
+        // 해시(#) 링크인 경우 해당 헤딩으로 이동
+        if (href.startsWith('#')) {
+          e.preventDefault();
+          const targetId = decodeURIComponent(href.slice(1));
+          scrollToHeading(targetId, link.textContent.trim());
+          return;
+        }
+
+        // 상대 경로 Markdown 파일 링크인 경우 (예: ./intro.md, doc/sub.markdown)
+        if (/\.(md|markdown|mdown|txt)(#.*)?$/i.test(href) && !/^(https?|mailto|file):/i.test(href)) {
+          e.preventDefault();
+          const parts = href.split('#');
+          const targetPath = decodeURIComponent(parts[0]);
+          const targetHash = parts[1] ? decodeURIComponent(parts[1]) : null;
+          if (window.chrome?.webview) {
+            window.chrome.webview.postMessage({
+              type: 'openRelative',
+              path: targetPath,
+              hash: targetHash
+            });
+          }
+        }
+      });
+      window.scrollToHeading = scrollToHeading;
+      window.mdDeskSaved = name => {
+        if (name) setTitle(name); setDirty(false); toast('저장했습니다.');
+        $('#statusMessage').textContent = `${name || currentName} 저장됨`;
+      };
+
+      document.documentElement.dataset.theme = localStorage.getItem('mdDeskTheme') || '';
+      if (localStorage.getItem('mdDeskSidebar') === 'hide') {
+        document.body.classList.add('sidebar-hidden');
+        $$('.nav-toggle').forEach(button => { button.classList.remove('active'); button.setAttribute('aria-pressed', 'false'); });
+      }
+      editor.value = starter; render(); setMode(localStorage.getItem('mdDeskMode') || 'preview'); setDirty(false); resetScrolls();
+    })();
+  </script>
+</body>
+</html>
