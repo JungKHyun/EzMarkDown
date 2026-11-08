@@ -9,8 +9,9 @@
 
 <p align="center">
   <img src="https://img.shields.io/badge/Platform-Windows%20%7C%20Web-blue?style=flat-square" alt="Platform">
-  <img src="https://img.shields.io/badge/Version-v1.1.0-brightgreen?style=flat-square" alt="Version">
+  <img src="https://img.shields.io/badge/Version-v1.2.0-brightgreen?style=flat-square" alt="Version">
   <img src="https://img.shields.io/badge/Portable-No%20Install-orange?style=flat-square" alt="No Install">
+  <img src="https://img.shields.io/badge/Multi--Window-Supported-blueviolet?style=flat-square" alt="Multi-Window">
   <img src="https://img.shields.io/badge/.NET-9.0-purple?style=flat-square" alt=".NET 9">
   <img src="https://img.shields.io/badge/License-MIT-lightgrey?style=flat-square" alt="License">
 </p>
@@ -20,6 +21,7 @@
 ## ✨ 왜 EzMarkDown 인가요?
 
 * ⚡ **압도적으로 빠르고 가볍습니다**: 복잡한 설정이나 무거운 설치 과정 없이 즉시 실행됩니다.
+* 🪟 **완벽한 멀티 창(Multi-Window) 지원**: 탐색기에서 여러 `.md` 파일을 열어도 기존 창이 사라지지 않고 각 문서가 독립된 새 창으로 열려 나란히 비교·작업할 수 있습니다.
 * 🌐 **웹 & 데스크톱 모두 지원**: `index.html` 단일 파일로 웹 브라우저에서 바로 열거나, Windows 단일 실행 파일(`.exe`)로 편리하게 사용할 수 있습니다.
 * 📊 **Mermaid 다이어그램 실시간 지원**: 순서도, 시퀀스, 클래스 다이어그램 등의 코드 블록을 미려한 그래픽 SVG로 실시간 변환합니다.
 * 📑 **스마트 목차(TOC) & 자동 추적**: 헤딩(H1~H6) 자동 목차 생성, 목차 검색, 본문 스크롤에 맞춘 현재 위치 하이라이트(ScrollSpy)를 지원합니다.
@@ -59,9 +61,11 @@
 
 | 기능 | 바로가기 키 | 설명 |
 |---|:---:|---|
-| **파일 열기** | <kbd>Ctrl</kbd> + <kbd>O</kbd> | 내 컴퓨터의 Markdown/텍스트 파일 열기 |
+| **파일 열기** | <kbd>Ctrl</kbd> + <kbd>O</kbd> | Markdown 파일 열기 (문서가 열려있을 시 새 창으로 자동 열기) |
+| **새 창 열기** | <kbd>Ctrl</kbd> + <kbd>Shift</kbd> + <kbd>N</kbd> | 새로운 MD Desk 독립 창 띄우기 |
+| **새 창에서 열기** | <kbd>Ctrl</kbd> + <kbd>Shift</kbd> + <kbd>O</kbd> | 기존 창을 유지한 채 새 창에서 파일 열기 |
 | **파일 저장** | <kbd>Ctrl</kbd> + <kbd>S</kbd> | 원본 파일에 즉시 저장 (새 문서일 경우 저장 위치 지정) |
-| **새 문서** | <kbd>Ctrl</kbd> + <kbd>N</kbd> | 빈 문서 새로 작성 |
+| **새 문서** | <kbd>Ctrl</kbd> + <kbd>N</kbd> | 현재 창에서 빈 문서 새로 작성 |
 | **목차 접기/펼치기** | <kbd>Ctrl</kbd> + <kbd>B</kbd> | 왼쪽 내비게이션(목차 트리) 사이드바 열기/닫기 |
 | **화면 최상단 이동** | <kbd>Ctrl</kbd> + <kbd>Home</kbd> | 문서의 맨 위로 즉시 스크롤 |
 | **서식 보기 전환** | <kbd>Ctrl</kbd> + <kbd>1</kbd> | 미리보기 전용 모드로 전환 |

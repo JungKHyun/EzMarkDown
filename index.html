@@ -317,14 +317,16 @@
     <header class="titlebar">
       <span class="logo">M</span>
       <span id="documentTitle">새 문서.md</span><span id="dirtyMark"></span>
-      <span style="margin-left:auto;opacity:.7">MD Desk v1.1.0</span>
+      <span style="margin-left:auto;opacity:.7">MD Desk v1.2.0</span>
     </header>
 
     <nav class="toolbar" aria-label="도구 모음">
       <div class="menus">
         <div class="menu"><button class="menu-button">파일</button><div class="menu-panel">
           <button data-action="new">새 문서 <span class="shortcut">Ctrl+N</span></button>
+          <button data-action="new-window">새 창 <span class="shortcut">Ctrl+Shift+N</span></button>
           <button data-action="open">파일 열기 <span class="shortcut">Ctrl+O</span></button>
+          <button data-action="open-new-window">새 창에서 파일 열기 <span class="shortcut">Ctrl+Shift+O</span></button>
           <button data-action="save">저장 <span class="shortcut">Ctrl+S</span></button>
           <button data-action="save-as">다른 이름으로 저장</button>
         </div></div>
@@ -877,7 +879,13 @@ graph LR
         }
       }
 
-      function setDirty(value) { dirty = value; $('#dirtyMark').textContent = dirty ? ' •' : ''; }
+      function setDirty(value) {
+        dirty = value;
+        $('#dirtyMark').textContent = dirty ? ' •' : '';
+        if (window.chrome?.webview) {
+          window.chrome.webview.postMessage({ type: 'dirty', dirty });
+        }
+      }
       function setTitle(name) { currentName = name || '문서.md'; $('#documentTitle').textContent = currentName; document.title = `${currentName} - MD Desk`; }
       function toast(message) { const el = $('.toast'); el.textContent = message; el.classList.add('show'); clearTimeout(el._timer); el._timer = setTimeout(() => el.classList.remove('show'), 2200); }
 
@@ -1034,6 +1042,22 @@ graph LR
       async function action(name) {
         $$('.menu').forEach(m => m.classList.remove('open'));
         if (name === 'open') return openFile();
+        if (name === 'new-window') {
+          if (window.chrome?.webview) {
+            window.chrome.webview.postMessage({ type: 'newWindow' });
+          } else {
+            window.open(window.location.href, '_blank');
+          }
+          return;
+        }
+        if (name === 'open-new-window') {
+          if (window.chrome?.webview) {
+            window.chrome.webview.postMessage({ type: 'openNewWindow' });
+          } else {
+            window.open(window.location.href, '_blank');
+          }
+          return;
+        }
         if (name === 'save') return saveFile(false);
         if (name === 'save-as') return saveFile(true);
         if (name === 'new') { if (dirty && !confirm('저장하지 않은 변경 내용이 있습니다. 새 문서를 만들까요?')) return; fileHandle = null; if (window.chrome?.webview) window.chrome.webview.postMessage({type:'clearPath'}); editor.value = ''; setTitle('새 문서.md'); setDirty(false); render(); setMode('edit'); resetScrolls(); }
@@ -1067,9 +1091,11 @@ graph LR
             <table>
               <thead><tr><th>단축키</th><th>기능 설명</th></tr></thead>
               <tbody>
-                <tr><td><code>Ctrl + O</code></td><td>Markdown 파일 열기</td></tr>
-                <tr><td><code>Ctrl + S</code></td><td>파일 저장 (원본 파일 또는 다운로드)</td></tr>
                 <tr><td><code>Ctrl + N</code></td><td>새 문서 작성</td></tr>
+                <tr><td><code>Ctrl + Shift + N</code></td><td>새 창 열기 (멀티 창)</td></tr>
+                <tr><td><code>Ctrl + O</code></td><td>Markdown 파일 열기</td></tr>
+                <tr><td><code>Ctrl + Shift + O</code></td><td>새 창에서 파일 열기</td></tr>
+                <tr><td><code>Ctrl + S</code></td><td>파일 저장 (원본 파일 또는 다운로드)</td></tr>
                 <tr><td><code>Ctrl + 1</code></td><td>서식 보기 모드</td></tr>
                 <tr><td><code>Ctrl + 2</code></td><td>나란히 보기 모드 (에디터 + 서식 미리보기)</td></tr>
                 <tr><td><code>Ctrl + 3</code></td><td>Markdown 편집 모드</td></tr>
@@ -1117,18 +1143,23 @@ pie title 데이터 비율
               <div style="width:40px;height:40px;background:var(--accent);color:#fff;border-radius:10px;display:grid;place-items:center;font-weight:900;font-size:20px;">M</div>
               <div>
                 <strong style="font-size:16px;">MD Desk</strong>
-                <span class="modal-badge">v1.1.0</span>
+                <span class="modal-badge">v1.2.0</span>
                 <div style="font-size:12px;color:var(--muted);margin-top:2px;">설치 없이 사용하는 가벼운 Markdown 뷰어·편집기</div>
               </div>
             </div>
             
-            <h4>🎉 v1.1.0 버전 업그레이드 내역</h4>
+            <h4>🎉 v1.2.0 주요 업데이트</h4>
             <ul style="padding-left:18px;margin:6px 0 16px;">
-              <li><strong>Mermaid 다이어그램 실시간 렌더링 지원</strong>: <code>\`\`\`mermaid</code> 코드 블록을 순서도, 시퀀스, 클래스, 상태도, 간트 차트 등 그래픽 SVG로 실시간 변환</li>
-              <li><strong>스마트 테마 연동</strong>: 밝은/어두운 화면(다크 모드) 전환 시 Mermaid 다이어그램 색상 자동 동기화</li>
-              <li><strong>안전한 오프라인 및 에러 방어</strong>: 오프라인이거나 문법 오류 시에도 문서가 깨지지 않고 원본 코드 보존</li>
-              <li><strong>모달 도움말 시스템</strong>: 단축키 및 Mermaid 작성법을 직관적으로 확인 가능한 팝업 제공</li>
-              <li><strong>런타임 호환성 개선</strong>: 최신 WebView2 런타임 환경에 최적화된 안정적인 초기화 파이프라인 적용</li>
+              <li><strong>멀티 창(Multi-Window) 완벽 지원</strong>: 여러 마크다운 파일을 열어도 기존 창이 덮어씌워지지 않고 각각 독립된 새 창으로 열람 및 편집 가능</li>
+              <li><strong>새 창 단축키 지원</strong>: <code>Ctrl+Shift+N</code> (새 창 열기), <code>Ctrl+Shift+O</code> (새 창에서 파일 열기)</li>
+              <li><strong>초고속 런타임 공유</strong>: 두 번째 창부터 딜레이 없이 즉시 팝업되는 가벼운 리소스 관리</li>
+            </ul>
+
+            <h4>이전 업데이트 내역 (v1.1.0)</h4>
+            <ul style="padding-left:18px;margin:6px 0 16px;">
+              <li><strong>Mermaid 다이어그램 실시간 렌더링</strong>: 순서도, 시퀀스, 클래스 등 그래픽 SVG 변환</li>
+              <li><strong>스마트 테마 연동</strong>: 라이트/다크 테마 전환 시 Mermaid 색상 자동 동기화</li>
+              <li><strong>오프라인 및 에러 방어</strong>: 문법 오류 시에도 문서 보존</li>
             </ul>
 
             <h4>기본 기능 (v1.0.0)</h4>
@@ -1180,6 +1211,10 @@ pie title 데이터 비율
         }
         if (!(e.ctrlKey || e.metaKey)) return;
         const key = e.key.toLowerCase();
+        if (e.shiftKey) {
+          if (key === 'n') { e.preventDefault(); action('new-window'); return; }
+          if (key === 'o') { e.preventDefault(); action('open-new-window'); return; }
+        }
         if (['o','s','n','1','2','3','b','home'].includes(key)) e.preventDefault();
         if (key === 'o') action('open'); if (key === 's') action('save'); if (key === 'n') action('new');
         if (key === '1') setMode('preview'); if (key === '2') setMode('split'); if (key === '3') setMode('edit'); if (key === 'b') action('toggle-sidebar');
